@@ -161,7 +161,13 @@ class ScheduleOptimizer:
         """
         Calculate a preference score for a matchup (higher is better).
         Considers tier matching, geographic clustering, etc.
+        
+        CRITICAL: Teams from the same school should NEVER play each other (Rule #23)
         """
+        # CRITICAL: Teams from same school CANNOT play each other
+        if team1.school == team2.school:
+            return -999999  # Extremely negative score to prevent this matchup
+        
         score = 0
         
         # Same tier is preferred
@@ -172,11 +178,7 @@ class ScheduleOptimizer:
         if team1.cluster and team2.cluster and team1.cluster == team2.cluster:
             score += PRIORITY_WEIGHTS['geographic_cluster']
         
-        # Same school is highly preferred (for clustering)
-        if team1.school == team2.school:
-            score += PRIORITY_WEIGHTS['cluster_same_school']
-        
-        # Same coach is preferred
+        # Same coach is preferred (but only if different schools)
         if team1.coach_name and team2.coach_name and team1.coach_name == team2.coach_name:
             score += PRIORITY_WEIGHTS['cluster_same_coach']
         
@@ -296,6 +298,10 @@ class ScheduleOptimizer:
         for i in range(num_teams):
             for j in range(i + 1, num_teams):
                 team1, team2 = teams[i], teams[j]
+                
+                # CRITICAL: Skip same-school matchups (Rule #23) - HARD constraint
+                if team1.school == team2.school:
+                    continue
                 
                 # Check do-not-play constraint
                 if team2.id in team1.do_not_play or team1.id in team2.do_not_play:
@@ -513,6 +519,10 @@ class ScheduleOptimizer:
         matchups = []
         for i, team1 in enumerate(teams):
             for j, team2 in enumerate(teams[i + 1:], start=i + 1):
+                # CRITICAL: Skip same-school matchups (Rule #23)
+                if team1.school == team2.school:
+                    continue
+                
                 # Skip do-not-play
                 if team2.id in team1.do_not_play or team1.id in team2.do_not_play:
                     continue
@@ -652,6 +662,10 @@ class ScheduleOptimizer:
                     potential_opponents = []
                     for opponent in teams:
                         if opponent.id == team.id:
+                            continue
+                        
+                        # CRITICAL: NEVER allow same-school matchups (Rule #23) - this is a HARD constraint
+                        if team.school == opponent.school:
                             continue
                         
                         # Skip do-not-play only in first few passes

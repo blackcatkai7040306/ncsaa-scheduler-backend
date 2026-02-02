@@ -20,8 +20,7 @@ backend/
 │       ├── __init__.py
 │       ├── scheduler.py   # Schedule optimization logic
 │       ├── validator.py  # Schedule validation
-│       ├── sheets_reader.py  # Google Sheets data reader
-│       └── sheets_writer.py  # Google Sheets data writer
+│       └── sheets_reader.py  # Google Sheets data reader
 ├── tests/                 # Test suite
 │   ├── __init__.py
 │   ├── test_scheduler.py
@@ -97,7 +96,6 @@ The API will be available at:
 python scripts/run_scheduler.py
 
 # Options:
-python scripts/run_scheduler.py --no-write    # Generate without writing to Sheets
 python scripts/run_scheduler.py --verbose     # Enable verbose output
 ```
 
@@ -115,6 +113,7 @@ python tests/test_scheduler.py
 python tests/test_game_counts.py
 python tests/test_time_rules.py
 python tests/test_time_slots_only.py
+python tests/test_bug_fixes.py
 ```
 
 ## Import Structure

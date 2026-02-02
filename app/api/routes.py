@@ -8,8 +8,8 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, date
 
 from app.services.sheets_reader import SheetsReader
-from app.services.sheets_writer import SheetsWriter
 from app.services.scheduler import ScheduleOptimizer
+from app.services.scheduler_v2 import SchoolBasedScheduler  # New school-based clustering algorithm  # NEW: School-based scheduler
 from app.services.validator import ScheduleValidator
 from app.models import Game, Division
 from app.core.config import (
@@ -92,9 +92,10 @@ async def generate_schedule(request: ScheduleRequest):
         reader = SheetsReader()
         teams, facilities, rules = reader.load_all_data()
         
-        # Generate schedule
+        # Generate schedule using NEW school-based algorithm
         print(f"Generating schedule for {len(teams)} teams...")
-        optimizer = ScheduleOptimizer(teams, facilities, rules)
+        print("Using REDESIGNED school-based scheduler (groups by schools, not divisions)")
+        optimizer = SchoolBasedScheduler(teams, facilities, rules)  # NEW SCHEDULER
         schedule = optimizer.optimize_schedule()
         
         # Validate schedule
@@ -139,23 +140,6 @@ async def generate_schedule(request: ScheduleRequest):
         # Calculate generation time
         generation_time = (datetime.now() - start_time).total_seconds()
         
-        # Write schedule to Google Sheets
-        sheets_written = False
-        sheets_error = None
-        try:
-            print("Writing schedule to Google Sheets...")
-            writer = SheetsWriter()
-            writer.write_schedule(schedule)
-            writer.write_summary_sheet(schedule, validation_result)
-            writer.write_team_schedules(schedule)
-            sheets_written = True
-            print("Schedule successfully written to Google Sheets!")
-        except Exception as e:
-            sheets_error = str(e)
-            print(f"Warning: Failed to write schedule to Google Sheets: {e}")
-            import traceback
-            traceback.print_exc()
-        
         # Prepare validation summary
         validation_summary = {
             "is_valid": validation_result.is_valid,
@@ -166,10 +150,6 @@ async def generate_schedule(request: ScheduleRequest):
         
         # Build success message
         message = f"Schedule generated successfully with {len(schedule.games)} games"
-        if sheets_written:
-            message += " and written to Google Sheets"
-        elif sheets_error:
-            message += f" (Warning: Google Sheets write failed: {sheets_error})"
         
         return ScheduleResponse(
             success=True,

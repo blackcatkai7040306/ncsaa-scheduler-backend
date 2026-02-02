@@ -12,9 +12,8 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.services.sheets_reader import SheetsReader
-from app.services.scheduler import ScheduleOptimizer
+from app.services.scheduler_v2 import SchoolBasedScheduler
 from app.services.validator import ScheduleValidator
-from app.services.sheets_writer import SheetsWriter
 
 
 def main():
@@ -29,11 +28,6 @@ def main():
         '--validate-only',
         action='store_true',
         help='Only validate existing schedule without generating new one'
-    )
-    parser.add_argument(
-        '--no-write',
-        action='store_true',
-        help='Generate schedule but do not write to Google Sheets'
     )
     parser.add_argument(
         '--verbose',
@@ -68,9 +62,10 @@ def main():
         print(f"  - {len(facilities)} facilities")
         print(f"  - Season: {rules.get('season_start')} to {rules.get('season_end')}")
         
-        # Step 2: Generate optimized schedule
+        # Step 2: Generate optimized schedule (using school-based clustering)
         print("\n[STEP 2] Generating optimized schedule...")
-        optimizer = ScheduleOptimizer(teams, facilities, rules)
+        print("Using school-based clustering algorithm (Rule #15)")
+        optimizer = SchoolBasedScheduler(teams, facilities, rules)
         schedule = optimizer.optimize_schedule()
         
         if not schedule or len(schedule.games) == 0:
@@ -99,24 +94,9 @@ def main():
         report = validator.generate_schedule_report(schedule)
         print("\n" + report)
         
-        # Step 5: Write schedule to Google Sheets
-        if not args.no_write:
-            print("\n[STEP 5] Writing schedule to Google Sheets...")
-            writer = SheetsWriter()
-            
-            # Write weekly schedules
-            writer.write_schedule(schedule)
-            
-            # Write summary sheet
-            writer.write_summary_sheet(schedule, validation_result)
-            
-            # Write team schedules
-            writer.write_team_schedules(schedule)
-            
-            print("\nSchedule successfully written to Google Sheets!")
-            print(f"View at: https://docs.google.com/spreadsheets/d/{reader.spreadsheet.id}")
-        else:
-            print("\n[STEP 5] Skipping write to Google Sheets (--no-write flag)")
+        # Step 5: Schedule generation complete (no longer writing to Google Sheets)
+        print("\n[STEP 5] Schedule generation complete")
+        print("Schedule is ready for use via API or frontend")
         
         # Final summary
         print("\n" + "=" * 80)
