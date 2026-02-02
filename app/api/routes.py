@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from datetime import datetime, date
+from celery.result import AsyncResult
 
 from app.services.sheets_reader import SheetsReader
 from app.services.scheduler import ScheduleOptimizer
@@ -24,6 +25,8 @@ from app.core.config import (
     ES_K1_REC_RIM_HEIGHT, ES_K1_REC_OFFICIALS, ES_K1_REC_PRIORITY_SITES,
     PRIORITY_WEIGHTS
 )
+from app.core.celery_app import celery_app
+from app.tasks.scheduler_tasks import generate_schedule_task
 
 
 router = APIRouter(prefix="/api", tags=["schedule"])
@@ -71,6 +74,78 @@ class ScheduleStats(BaseModel):
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+
+@router.post("/schedule/async")
+async def generate_schedule_async(request: ScheduleRequest):
+    """
+    Start async schedule generation task.
+    
+    Returns:
+        dict: Task ID for polling status
+    """
+    try:
+        # Start Celery task
+        task = generate_schedule_task.delay()
+        
+        return {
+            "task_id": task.id,
+            "status": "PENDING",
+            "message": "Schedule generation started"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to start task: {str(e)}")
+
+
+@router.get("/schedule/status/{task_id}")
+async def get_schedule_status(task_id: str):
+    """
+    Get status of async schedule generation task.
+    
+    Args:
+        task_id: Celery task ID
+        
+    Returns:
+        dict: Task status and result (if complete)
+    """
+    try:
+        task_result = AsyncResult(task_id, app=celery_app)
+        
+        if task_result.state == "PENDING":
+            response = {
+                "task_id": task_id,
+                "status": "PENDING",
+                "message": "Task is waiting to start..."
+            }
+        elif task_result.state == "PROGRESS":
+            response = {
+                "task_id": task_id,
+                "status": "PROGRESS",
+                "message": task_result.info.get("status", "Processing...")
+            }
+        elif task_result.state == "SUCCESS":
+            result = task_result.result
+            response = {
+                "task_id": task_id,
+                "status": "SUCCESS",
+                "result": result
+            }
+        elif task_result.state == "FAILURE":
+            response = {
+                "task_id": task_id,
+                "status": "FAILURE",
+                "message": str(task_result.info)
+            }
+        else:
+            response = {
+                "task_id": task_id,
+                "status": task_result.state,
+                "message": f"Task state: {task_result.state}"
+            }
+        
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get task status: {str(e)}")
 
 
 @router.post("/schedule", response_model=ScheduleResponse)

@@ -4,5 +4,9 @@ uvicorn[standard]==0.34.0
 pydantic==2.10.5
 python-multipart==0.0.20
 
+# Celery for async task processing
+celery==5.4.0
+redis==5.2.1
+
 # Include all requirements from main application
 -r requirements.txt
